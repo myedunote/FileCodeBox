@@ -1,5 +1,4 @@
 import hashlib
-import asyncio
 import hmac
 import os
 import uuid
@@ -11,7 +10,7 @@ from typing import Optional, Tuple, Union
 from fastapi import APIRouter, Form, Request, UploadFile, File, Depends, HTTPException
 from pydantic import BaseModel, ValidationError
 from starlette import status
-from starlette.responses import HTMLResponse, Response
+from starlette.responses import Response
 from tortoise.expressions import Case, F, Q, When
 
 from apps.base.auth import share_required_login
@@ -40,7 +39,6 @@ from apps.base.utils import (
     validate_expire_style,
 )
 from apps.base.local_share import is_local_ref
-from apps.base.mcp import sanitize_html_preview
 from core.response import APIResponse
 from core.settings import settings
 from core.storage import storages, FileStorageInterface
@@ -196,49 +194,6 @@ async def post_file_metadata(
     return APIResponse(detail=build_file_metadata(file_code))
 
 
-@share_api.get("/preview/html/{code}", include_in_schema=False)
-async def preview_html(code: str):
-    has, file_code = await get_code_file_by_code(code)
-    if not has or not isinstance(file_code, FileCodes):
-        raise HTTPException(status_code=404, detail="文件不存在")
-    if file_code.text is not None or (file_code.suffix or "").lower() not in {".html", ".htm"}:
-        raise HTTPException(status_code=415, detail="仅支持 HTML 文件预览")
-    preview_limit = 2 * 1024 * 1024
-    if file_code.size > preview_limit:
-        raise HTTPException(status_code=413, detail="HTML 文件过大，无法在线预览")
-    download = await get_stored_download(file_code)
-    if download.path is not None:
-        if download.path.stat().st_size > preview_limit:
-            raise HTTPException(status_code=413, detail="HTML 文件过大，无法在线预览")
-        content = await asyncio.to_thread(download.path.read_bytes)
-    elif download.content is not None:
-        content = download.content
-    elif download.stream_factory is not None:
-        stream = download.stream_factory()
-        if hasattr(stream, "__aiter__"):
-            chunks = bytearray()
-            async for chunk in stream:
-                chunks.extend(chunk)
-                if len(chunks) > preview_limit:
-                    raise HTTPException(status_code=413, detail="HTML 文件过大，无法在线预览")
-            content = bytes(chunks)
-        else:
-            raise HTTPException(status_code=500, detail="HTML 预览读取失败")
-    else:
-        raise HTTPException(status_code=500, detail="HTML 预览读取失败")
-    if len(content) > preview_limit:
-        raise HTTPException(status_code=413, detail="HTML 文件过大，无法在线预览")
-    safe_html = sanitize_html_preview(content.decode("utf-8-sig", errors="replace"))
-    return HTMLResponse(
-        safe_html,
-        headers={
-            "Content-Security-Policy": "sandbox; default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'",
-            "X-Content-Type-Options": "nosniff",
-            "Cache-Control": "private, no-store",
-            "Content-Disposition": 'inline; filename="preview.html"',
-        },
-        background=download.background,
-    )
 
 
 @share_api.get("/select/")

@@ -5,7 +5,6 @@ import html
 import io
 import json
 from typing import Any
-from html.parser import HTMLParser
 from urllib.parse import quote, urlsplit
 
 from fastapi import APIRouter, HTTPException, Request, UploadFile
@@ -230,75 +229,3 @@ async def mcp_endpoint(request: Request):
             _jsonrpc_error(request_id, -32001 if exc.status_code == 401 else -32003, str(exc.detail)),
             status_code=exc.status_code,
         )
-
-
-_SAFE_TAGS = {
-    "a", "abbr", "article", "b", "blockquote", "br", "caption", "code", "dd", "del", "details",
-    "div", "dl", "dt", "em", "figcaption", "figure", "h1", "h2", "h3", "h4", "h5", "h6",
-    "hr", "i", "img", "li", "main", "mark", "ol", "p", "pre", "s", "section", "small", "span",
-    "strong", "sub", "summary", "sup", "table", "tbody", "td", "th", "thead", "tr", "u", "ul",
-}
-_VOID_TAGS = {"br", "hr", "img"}
-_DROP_CONTENT_TAGS = {"script", "style", "iframe", "object", "embed", "svg", "math", "form", "template"}
-_SAFE_ATTRS = {"alt", "title", "class", "id", "colspan", "rowspan", "width", "height", "scope", "dir", "lang"}
-
-
-class _HTMLPreviewSanitizer(HTMLParser):
-    """Whitelist-only HTML serializer; scripts, active embeds and URL attrs are removed."""
-
-    def __init__(self):
-        super().__init__(convert_charrefs=True)
-        self.output: list[str] = []
-        self.drop_depth = 0
-
-    def handle_starttag(self, tag, attrs):
-        tag = tag.lower()
-        if self.drop_depth:
-            if tag in _DROP_CONTENT_TAGS:
-                self.drop_depth += 1
-            return
-        if tag in _DROP_CONTENT_TAGS:
-            self.drop_depth = 1
-            return
-        if tag not in _SAFE_TAGS:
-            return
-        safe_attrs = []
-        for name, value in attrs:
-            name = name.lower()
-            if value is None or name.startswith("on") or name not in _SAFE_ATTRS:
-                continue
-            safe_attrs.append(f' {name}="{html.escape(value, quote=True)}"')
-        self.output.append(f"<{tag}{''.join(safe_attrs)}>")
-
-    def handle_startendtag(self, tag, attrs):
-        self.handle_starttag(tag, attrs)
-        if tag.lower() in _SAFE_TAGS and tag.lower() not in _VOID_TAGS:
-            self.handle_endtag(tag)
-
-    def handle_endtag(self, tag):
-        tag = tag.lower()
-        if self.drop_depth:
-            if tag in _DROP_CONTENT_TAGS:
-                self.drop_depth -= 1
-            return
-        if tag in _SAFE_TAGS and tag not in _VOID_TAGS:
-            self.output.append(f"</{tag}>")
-
-    def handle_data(self, data):
-        if not self.drop_depth:
-            self.output.append(html.escape(data))
-
-    def handle_entityref(self, name):
-        if not self.drop_depth:
-            self.output.append(f"&amp;{html.escape(name)};")
-
-    def handle_charref(self, name):
-        if not self.drop_depth:
-            self.output.append(f"&amp;#{html.escape(name)};")
-
-
-def sanitize_html_preview(source: str) -> str:
-    parser = _HTMLPreviewSanitizer()
-    parser.feed(source)
-    parser.close()
-    return "<!doctype html><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><body>" + "".join(parser.output) + "</body>"
