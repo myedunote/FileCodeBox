@@ -54,7 +54,7 @@ RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
     echo 'Asia/Shanghai' > /etc/timezone
 
 # 从构建阶段复制编译好的前端主题
-COPY --from=frontend-builder /build/fronted-2024/dist ./themes/2024
+COPY --from=frontend-builder /build/FileCodeBox/themes/2024 ./themes/2024
 COPY --from=frontend-builder /build/fronted-2023/dist ./themes/2023
 
 # 安装系统安全更新 + Python 依赖
