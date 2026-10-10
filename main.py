@@ -28,6 +28,7 @@ from apps.base.tasks import (
     delete_expire_files,
 )
 from apps.base.views import share_api, chunk_api, presign_api
+from apps.base.mcp import router as mcp_router
 from core.database import db_startup_lock, get_db_config, init_db
 from core.errors import StorageError
 from core.logger import get_log_level_name, is_access_log_enabled, logger
@@ -139,6 +140,7 @@ app.include_router(presign_api)
 app.include_router(presign_api, prefix="/api")
 app.include_router(admin_api)
 app.include_router(pages_router)
+app.include_router(mcp_router)
 
 # 404 时返回主题首页（index 兼任 exception handler 与 GET / 路由）
 app.add_exception_handler(404, not_found_handler)

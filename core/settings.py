@@ -48,6 +48,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "jwt_secret": "",
     "admin_session_expire": ADMIN_SESSION_EXPIRE_DEFAULT,
     "open_upload": 1,
+    "mcp_require_token": 0,
     "upload_size": 1024 * 1024 * 10,
     "allowed_file_types": ["*"],
     "expire_style": ["day", "hour", "minute", "forever", "count"],

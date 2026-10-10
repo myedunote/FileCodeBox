@@ -40,6 +40,7 @@ class ConfigService:
         "max_save_seconds",
         "onedrive_proxy",
         "open_upload",
+        "mcp_require_token",
         "port",
         "s3_proxy",
         "server_port",
