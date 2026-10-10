@@ -4,6 +4,7 @@ import binascii
 import html
 import io
 import json
+from typing import Any
 from html.parser import HTMLParser
 from urllib.parse import quote, urlsplit
 
@@ -191,6 +192,7 @@ async def mcp_endpoint(request: Request):
     method = message["method"]
     if request_id is None and method.startswith("notifications/"):
         return Response(status_code=202)
+    result: dict[str, Any] = {}
     try:
         if method == "initialize":
             result = {
